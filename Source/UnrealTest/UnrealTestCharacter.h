@@ -44,6 +44,15 @@ class AUnrealTestCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	UPROPERTY(EditDefaultsOnly, Category = Input)
+	TObjectPtr<UInputAction> AttackAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = Montages)
+	TObjectPtr<UAnimMontage> AttackMontage;
+
+	UPROPERTY(VisibleAnywhere, Category = Attack)
+	bool bCanAttack{false};
+
 public:
 	AUnrealTestCharacter();
 	
@@ -55,6 +64,8 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+	
+	void Attack(const FInputActionValue& Value);
 			
 
 protected:

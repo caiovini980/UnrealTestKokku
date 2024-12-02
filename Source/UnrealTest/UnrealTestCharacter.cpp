@@ -50,8 +50,7 @@ AUnrealTestCharacter::AUnrealTestCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	bCanAttack = true;
 }
 
 void AUnrealTestCharacter::BeginPlay()
@@ -86,6 +85,9 @@ void AUnrealTestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Look);
+
+		// Attacking
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Attack);
 	}
 	else
 	{
@@ -126,5 +128,27 @@ void AUnrealTestCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void AUnrealTestCharacter::Attack(const FInputActionValue& Value)
+{
+	// TODO EXECUTE THIS ON THE SERVER
+	// Create a ROS event and call it, then create a MULTICAST event to replicate it to the clients
+	if (AttackMontage.Get() != nullptr)
+	{
+		bCanAttack = false;
+		
+		if (bool IsAttacking = Value.Get<bool>())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Heavy attack!"))
+		PlayAnimMontage(AttackMontage.Get(), 1, FName("BasicAttack"));
+			return;
+		}
+		
+		UE_LOG(LogTemp, Warning, TEXT("Light attack!"))
+		// TODO Reset this on the animation notify
+		// basic attack
+		PlayAnimMontage(AttackMontage.Get(), 1.5, FName("BasicAttack"));
 	}
 }
