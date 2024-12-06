@@ -7,15 +7,19 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
+#include "Private/Armory/Weapons/Sword.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "MovieSceneTracksComponentTypes.h"
+#include "Net/UnrealNetwork.h"
+
+#include "Private/Characters/Common/Animations/AnimNotifies/AttackEndNotify.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 //////////////////////////////////////////////////////////////////////////
 // AUnrealTestCharacter
-
 AUnrealTestCharacter::AUnrealTestCharacter()
 {
 	// Set size for collision capsule
@@ -50,13 +54,40 @@ AUnrealTestCharacter::AUnrealTestCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	bCanAttack = true;
+	Server_SetCanAttack(true);
+}
+
+void AUnrealTestCharacter::InitMontages()
+{
+	if (AttackMontage)
+	{
+		const auto NotifyEvents = AttackMontage->Notifies;
+
+		for (const auto& EventNotify : NotifyEvents)
+		{
+			if (const auto AttackEndedNotify = Cast<UAttackEndNotify>(EventNotify.Notify))
+			{
+				AttackEndedNotify->OnNotified.AddUObject(this, &AUnrealTestCharacter::AttackEndedNotifyImplementation);
+			}
+		}
+	}
+}
+
+void AUnrealTestCharacter::AttackEndedNotifyImplementation()
+{
+	if (HasAuthority())
+	{
+		Server_SetCanAttack(true);
+	}
 }
 
 void AUnrealTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
+	Server_SetCanAttack(true);
+
+	InitMontages();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -133,22 +164,88 @@ void AUnrealTestCharacter::Look(const FInputActionValue& Value)
 
 void AUnrealTestCharacter::Attack(const FInputActionValue& Value)
 {
-	// TODO EXECUTE THIS ON THE SERVER
-	// Create a ROS event and call it, then create a MULTICAST event to replicate it to the clients
 	if (AttackMontage.Get() != nullptr)
 	{
-		bCanAttack = false;
-		
-		if (bool IsAttacking = Value.Get<bool>())
+		if (Value.Get<bool>())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Heavy attack!"))
-		PlayAnimMontage(AttackMontage.Get(), 1, FName("BasicAttack"));
+			Server_HeavyAttack();
 			return;
 		}
-		
+
+		Server_LightAttack();
+	}
+}
+
+/* Multiplayer Methods */
+/* Client Methods */
+/* Multicasts */
+void AUnrealTestCharacter::HeavyAttack_Implementation()
+{
+	if (bCanAttack)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Heavy attack!"))
+		PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
+	}
+}
+
+void AUnrealTestCharacter::LightAttack_Implementation()
+{
+	if (bCanAttack)
+	{
 		UE_LOG(LogTemp, Warning, TEXT("Light attack!"))
 		// TODO Reset this on the animation notify
 		// basic attack
-		PlayAnimMontage(AttackMontage.Get(), 1.5, FName("BasicAttack"));
+		PlayAnimMontage(AttackMontage.Get(), 1.5, FName("LightAttack"));
 	}
+}
+
+/* Server Methods */
+/* Replicated props */
+void AUnrealTestCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AUnrealTestCharacter, bCanAttack);
+}
+
+/* Run On Server */
+bool AUnrealTestCharacter::Server_LightAttack_Validate()
+{
+	if (!AttackMontage)
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[SERVER] Executing LightAttack_Validate..."))
+	return true;
+	
+}
+
+void AUnrealTestCharacter::Server_LightAttack_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[SERVER] LightAttack_Implementation HAS BEEN CALLED"))
+	LightAttack();
+	Server_SetCanAttack(false);
+}
+
+bool AUnrealTestCharacter::Server_HeavyAttack_Validate()
+{
+	if (!AttackMontage)
+	{
+		return false;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[SERVER] Executing HeavyAttack_Validate..."))
+	return true;
+}
+
+void AUnrealTestCharacter::Server_HeavyAttack_Implementation()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[SERVER] HeavyAttack_Implementation HAS BEEN CALLED"))
+	HeavyAttack();
+	Server_SetCanAttack(false);
+}
+
+void AUnrealTestCharacter::Server_SetCanAttack_Implementation(bool NewValue)
+{
+	bCanAttack = NewValue;
 }

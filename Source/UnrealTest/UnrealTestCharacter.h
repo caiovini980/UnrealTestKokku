@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class ASword;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -50,23 +51,43 @@ class AUnrealTestCharacter : public ACharacter
 	UPROPERTY(EditDefaultsOnly, Category = Montages)
 	TObjectPtr<UAnimMontage> AttackMontage;
 
-	UPROPERTY(VisibleAnywhere, Category = Attack)
-	bool bCanAttack{false};
+	void InitMontages();	
+	void AttackEndedNotifyImplementation();
 
 public:
 	AUnrealTestCharacter();
-	
 
 protected:
-
-	/** Called for movement input */
+	/** Action Methods */
 	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
-	
 	void Attack(const FInputActionValue& Value);
-			
+
+	/* Server Methods */
+	/* Multicasts */
+	UFUNCTION(NetMulticast, reliable)
+	void HeavyAttack();
+
+	UFUNCTION(NetMulticast, reliable)
+	void LightAttack();
+	
+	/* Run On Server */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_LightAttack();
+	bool Server_LightAttack_Validate(); 
+	
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_HeavyAttack();
+	bool Server_HeavyAttack_Validate(); 
+
+	UFUNCTION(Server, Reliable, BlueprintCallable)
+	void Server_SetCanAttack(bool NewValue);
+
+	/* Server Variables */
+	UPROPERTY(Replicated)
+	bool bCanAttack;
+
+	// TODO: create a SetCanAttack method
 
 protected:
 	// APawn interface
