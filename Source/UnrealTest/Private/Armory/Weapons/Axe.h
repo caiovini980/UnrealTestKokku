@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Armory/ArmoryBase.h"
-#include "Sword.generated.h"
+#include "Axe.generated.h"
 
 class UBoxComponent;
 
@@ -12,12 +12,12 @@ class UBoxComponent;
  * 
  */
 UCLASS()
-class ASword : public AArmoryBase
+class AAxe : public AArmoryBase
 {
 	GENERATED_BODY()
 
 public:
-	ASword();
+	AAxe();
 
 	UBoxComponent* GetCollider() const;
 	float GetDamage() const;

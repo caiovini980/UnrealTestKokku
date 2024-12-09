@@ -7,7 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
-#include "Private/Armory/Weapons/Sword.h"
+#include "Private/Armory/Weapons/Axe.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -53,11 +53,9 @@ AUnrealTestCharacter::AUnrealTestCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
-
-	Server_SetCanAttack(true);
 }
 
-void AUnrealTestCharacter::InitMontages()
+void AUnrealTestCharacter::InitAttackNotifies()
 {
 	if (AttackMontage)
 	{
@@ -73,11 +71,29 @@ void AUnrealTestCharacter::InitMontages()
 	}
 }
 
+void AUnrealTestCharacter::InitBlockNotifies()
+{
+	if (BlockMontage)
+	{
+		// const auto NotifyEvents = BlockMontage->Notifies;
+		//
+		// for (const auto& EventNotify : NotifyEvents)
+		// {
+		// }
+	}
+}
+
+void AUnrealTestCharacter::InitMontageNotifies()
+{
+	InitAttackNotifies();
+	InitBlockNotifies();
+}
+
 void AUnrealTestCharacter::AttackEndedNotifyImplementation()
 {
 	if (HasAuthority())
 	{
-		Server_SetCanAttack(true);
+		Server_SetCanDoAction(true);
 	}
 }
 
@@ -85,9 +101,15 @@ void AUnrealTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-	Server_SetCanAttack(true);
+	if (BlockOngoingMontage)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Loop is enabled"));
+		BlockOngoingMontage.Get()->bLoop = true;
+	}
+	
+	Server_SetCanDoAction(true);
 
-	InitMontages();
+	InitMontageNotifies();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -118,7 +140,10 @@ void AUnrealTestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Look);
 
 		// Attacking
-		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Attack);
+		EnhancedInputComponent->BindAction(AttackAction.Get(), ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Attack);
+
+		// Blocking
+		EnhancedInputComponent->BindAction(BlockAction.Get(), ETriggerEvent::Triggered, this, &AUnrealTestCharacter::Block);
 	}
 	else
 	{
@@ -176,12 +201,38 @@ void AUnrealTestCharacter::Attack(const FInputActionValue& Value)
 	}
 }
 
+void AUnrealTestCharacter::Block(const FInputActionValue& Value)
+{
+	if (BlockMontage.Get() != nullptr)
+	{
+		if (bCanDoAction)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("BLOCK!"))
+			Server_SetCanDoAction(false);
+			PlayAnimMontage(BlockMontage.Get(), 1.5, FName("BlockStart"));
+			PlayAnimMontage(BlockOngoingMontage.Get(), 1);
+			bIsHoldingShield = true;
+			bUseControllerRotationYaw = true;
+			return;		
+		}
+
+		if (bIsHoldingShield)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Exiting BLOCK!"))
+			PlayAnimMontage(BlockMontage.Get(), -2, FName("BlockStart"));
+			Server_SetCanDoAction(true);
+			bIsHoldingShield = false;
+			bUseControllerRotationYaw = false;
+		}
+	}
+}
+
 /* Multiplayer Methods */
 /* Client Methods */
 /* Multicasts */
 void AUnrealTestCharacter::HeavyAttack_Implementation()
 {
-	if (bCanAttack)
+	if (bCanDoAction)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Heavy attack!"))
 		PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
@@ -190,7 +241,7 @@ void AUnrealTestCharacter::HeavyAttack_Implementation()
 
 void AUnrealTestCharacter::LightAttack_Implementation()
 {
-	if (bCanAttack)
+	if (bCanDoAction)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Light attack!"))
 		// TODO Reset this on the animation notify
@@ -204,7 +255,7 @@ void AUnrealTestCharacter::LightAttack_Implementation()
 void AUnrealTestCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AUnrealTestCharacter, bCanAttack);
+	DOREPLIFETIME(AUnrealTestCharacter, bCanDoAction);
 }
 
 /* Run On Server */
@@ -224,7 +275,7 @@ void AUnrealTestCharacter::Server_LightAttack_Implementation()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[SERVER] LightAttack_Implementation HAS BEEN CALLED"))
 	LightAttack();
-	Server_SetCanAttack(false);
+	Server_SetCanDoAction(false);
 }
 
 bool AUnrealTestCharacter::Server_HeavyAttack_Validate()
@@ -242,10 +293,10 @@ void AUnrealTestCharacter::Server_HeavyAttack_Implementation()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[SERVER] HeavyAttack_Implementation HAS BEEN CALLED"))
 	HeavyAttack();
-	Server_SetCanAttack(false);
+	Server_SetCanDoAction(false);
 }
 
-void AUnrealTestCharacter::Server_SetCanAttack_Implementation(bool NewValue)
+void AUnrealTestCharacter::Server_SetCanDoAction_Implementation(bool NewValue)
 {
-	bCanAttack = NewValue;
+	bCanDoAction = NewValue;
 }
