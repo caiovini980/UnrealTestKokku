@@ -8,9 +8,6 @@
 
 class UBoxComponent;
 
-/**
- * 
- */
 UCLASS()
 class AAxe : public AArmoryBase
 {
@@ -24,7 +21,10 @@ public:
 	void EnableCollider(bool bEnabled) const;
 	float GetDamage() const;
 	
-private:	
+private:
+	UFUNCTION()
+	void OnHitTarget(UPrimitiveComponent* Component, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+	
 	UPROPERTY()
 	TObjectPtr<UBoxComponent> Collider;
 

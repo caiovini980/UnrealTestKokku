@@ -17,6 +17,8 @@ void AAxe::SetupArmory()
 	{
 		UE_LOG(LogTemp, Error, TEXT("Axe couldn't set up correctly: Collider is missing."))
 	}
+
+	Collider->OnComponentBeginOverlap.AddDynamic(this, &AAxe::OnHitTarget);
 }
 
 void AAxe::EnableCollider(bool bEnabled) const
@@ -54,4 +56,14 @@ void AAxe::EnableCollider(bool bEnabled) const
 float AAxe::GetDamage() const
 {
 	return Damage;
+}
+
+// Events
+void AAxe::OnHitTarget(UPrimitiveComponent* Component, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
+	const FHitResult& SweepResult)
+{
+	if (HasAuthority() && OtherActor != Owner)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Collision detected with %s"), *OtherActor->GetName());
+	}
 }
