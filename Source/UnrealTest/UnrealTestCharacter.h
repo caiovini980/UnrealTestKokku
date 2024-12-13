@@ -11,8 +11,20 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
-class AAxe;
 struct FInputActionValue;
+
+class AAxe;
+class AShield;
+
+UENUM(BlueprintType)
+enum PlayerActionState
+{
+	PAS_Neutral UMETA(DisplayName = "Neutral"),
+	PAS_Block UMETA(DisplayName = "Block"),
+	PAS_Attack UMETA(DisplayName = "Attack"),
+	PAS_Hit UMETA(DisplayName = "Hit"),
+	PAS_Dead UMETA(DisplayName = "Dead"),
+};
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
@@ -30,12 +42,12 @@ public:
 protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void BeginPlay() override;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Gameplay)
-	bool bIsHoldingShield;
+
+	/* Server Variables */
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly)
+	TEnumAsByte<PlayerActionState> ActionState;
 
 private:
-	/* References */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
 
@@ -63,23 +75,23 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = Montages)
 	TObjectPtr<UAnimMontage> BlockOngoingMontage;
 	
-	/* Variables */
+	UPROPERTY(VisibleDefaultsOnly, Category = Armory)
+	TObjectPtr<AAxe> AxeRef;
+	UPROPERTY(VisibleDefaultsOnly, Category = Armory)
+	TObjectPtr<AShield> ShieldRef;
 	
 	/* Methods */
 	void InitMontageNotifies();
 
 	void InitAttackNotifies();
-	void InitBlockNotifies();
+	void InitBlockNotifies() const;
 	void AttackEndedNotifyImplementation();
+	void DisableWeaponColliderNotifyImplementation();
 	
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
 	void Attack(const FInputActionValue& Value);
 	void Block(const FInputActionValue& Value);
-
-	/* Server Variables */
-	UPROPERTY(Replicated)
-	bool bCanDoAction;
 	
 	/* Server Methods */
 	/* Multicasts */
@@ -88,17 +100,22 @@ private:
 
 	UFUNCTION(NetMulticast, reliable)
 	void LightAttack();
+
+	UFUNCTION(NetMulticast, reliable)
+	void ExecuteBlock();
+
+	UFUNCTION(NetMulticast, reliable)
+	void ExitBlock();
 	
 	/* Run On Server */
-	UFUNCTION(Server, Reliable, WithValidation)
+	UFUNCTION(Server, Reliable)
 	void Server_LightAttack();
-	bool Server_LightAttack_Validate(); 
 	
-	UFUNCTION(Server, Reliable, WithValidation)
+	UFUNCTION(Server, Reliable)
 	void Server_HeavyAttack();
-	bool Server_HeavyAttack_Validate(); 
 
-	UFUNCTION(Server, Reliable, BlueprintCallable)
-	void Server_SetCanDoAction(bool NewValue);
+	UFUNCTION(Server, Reliable)
+	void Server_UseShield(bool IsPressingToBlock);
+	
 };
 

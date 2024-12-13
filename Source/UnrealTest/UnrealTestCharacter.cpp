@@ -11,10 +11,11 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
-#include "MovieSceneTracksComponentTypes.h"
+#include "Armory/Shields/Shield.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Private/Characters/Common/Animations/AnimNotifies/AttackEndNotify.h"
+#include "Private/Characters/Common/Animations/AnimNotifies/DisableWeaponColliderNotify.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -67,11 +68,17 @@ void AUnrealTestCharacter::InitAttackNotifies()
 			{
 				AttackEndedNotify->OnNotified.AddUObject(this, &AUnrealTestCharacter::AttackEndedNotifyImplementation);
 			}
+
+			if (const auto DisableWeaponColliderNotify = Cast<UDisableWeaponColliderNotify>(EventNotify.Notify))
+			{
+				DisableWeaponColliderNotify->OnNotified.AddUObject(this, &AUnrealTestCharacter::DisableWeaponColliderNotifyImplementation);
+
+			}
 		}
 	}
 }
 
-void AUnrealTestCharacter::InitBlockNotifies()
+void AUnrealTestCharacter::InitBlockNotifies() const
 {
 	if (BlockMontage)
 	{
@@ -91,9 +98,18 @@ void AUnrealTestCharacter::InitMontageNotifies()
 
 void AUnrealTestCharacter::AttackEndedNotifyImplementation()
 {
+	// Reset caracter to neutral stage
 	if (HasAuthority())
 	{
-		Server_SetCanDoAction(true);
+		ActionState = PAS_Neutral;
+	}
+}
+
+void AUnrealTestCharacter::DisableWeaponColliderNotifyImplementation()
+{
+	if (HasAuthority() && AxeRef.Get())
+	{
+		AxeRef.Get()->EnableCollider(false);
 	}
 }
 
@@ -101,14 +117,25 @@ void AUnrealTestCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
-	if (BlockOngoingMontage)
+	ActionState = PAS_Neutral;
+
+	// Get Axe and Shield
+	TArray<AActor*> ChildActors;
+	GetAllChildActors(ChildActors);
+
+	for (auto Child : ChildActors)
 	{
-		UE_LOG(LogTemp, Display, TEXT("Loop is enabled"));
-		BlockOngoingMontage.Get()->bLoop = true;
+		if (AShield* ShieldObject = Cast<AShield>(Child))
+		{
+			ShieldRef = ShieldObject;
+		}
+		else if (AAxe* AxeObject = Cast<AAxe>(Child))
+		{
+			AxeRef = AxeObject;
+		}
 	}
 	
-	Server_SetCanDoAction(true);
-
+	// Setup animation notifies
 	InitMontageNotifies();
 }
 
@@ -153,7 +180,6 @@ void AUnrealTestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 void AUnrealTestCharacter::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
@@ -162,13 +188,9 @@ void AUnrealTestCharacter::Move(const FInputActionValue& Value)
 		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
-		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
@@ -176,7 +198,6 @@ void AUnrealTestCharacter::Move(const FInputActionValue& Value)
 
 void AUnrealTestCharacter::Look(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
@@ -189,7 +210,7 @@ void AUnrealTestCharacter::Look(const FInputActionValue& Value)
 
 void AUnrealTestCharacter::Attack(const FInputActionValue& Value)
 {
-	if (AttackMontage.Get() != nullptr)
+	if (AttackMontage.Get() != nullptr && ActionState == PAS_Neutral)
 	{
 		if (Value.Get<bool>())
 		{
@@ -203,51 +224,49 @@ void AUnrealTestCharacter::Attack(const FInputActionValue& Value)
 
 void AUnrealTestCharacter::Block(const FInputActionValue& Value)
 {
+	bool bIsPressing = Value.Get<bool>();
+	//UE_LOG(LogTemp, Warning, TEXT("Block check: %i"), bIsPressing)
+
 	if (BlockMontage.Get() != nullptr)
 	{
-		if (bCanDoAction)
+		if (ActionState == PAS_Neutral && bIsPressing)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("BLOCK!"))
-			Server_SetCanDoAction(false);
-			PlayAnimMontage(BlockMontage.Get(), 1.5, FName("BlockStart"));
-			PlayAnimMontage(BlockOngoingMontage.Get(), 1);
-			bIsHoldingShield = true;
-			bUseControllerRotationYaw = true;
-			return;		
+			ExecuteBlock_Implementation();
 		}
 
-		if (bIsHoldingShield)
+		// if when check the player is blocking, it must stop using it
+		else if (ActionState == PAS_Block && !bIsPressing)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Exiting BLOCK!"))
-			PlayAnimMontage(BlockMontage.Get(), -2, FName("BlockStart"));
-			Server_SetCanDoAction(true);
-			bIsHoldingShield = false;
-			bUseControllerRotationYaw = false;
+			ExitBlock_Implementation();
 		}
+
+		Server_UseShield(bIsPressing);
 	}
 }
 
 /* Multiplayer Methods */
 /* Client Methods */
 /* Multicasts */
+void AUnrealTestCharacter::ExecuteBlock_Implementation()
+{
+	bUseControllerRotationYaw = true;
+}
+
+void AUnrealTestCharacter::ExitBlock_Implementation()
+{
+	bUseControllerRotationYaw = false;
+}
+
 void AUnrealTestCharacter::HeavyAttack_Implementation()
 {
-	if (bCanDoAction)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Heavy attack!"))
-		PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
-	}
+	PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
+	AxeRef.Get()->EnableCollider(true);
 }
 
 void AUnrealTestCharacter::LightAttack_Implementation()
 {
-	if (bCanDoAction)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Light attack!"))
-		// TODO Reset this on the animation notify
-		// basic attack
-		PlayAnimMontage(AttackMontage.Get(), 1.5, FName("LightAttack"));
-	}
+	PlayAnimMontage(AttackMontage.Get(), 1.5, FName("LightAttack"));
+	AxeRef.Get()->EnableCollider(true);
 }
 
 /* Server Methods */
@@ -255,48 +274,49 @@ void AUnrealTestCharacter::LightAttack_Implementation()
 void AUnrealTestCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AUnrealTestCharacter, bCanDoAction);
+	DOREPLIFETIME(AUnrealTestCharacter, ActionState);
 }
 
 /* Run On Server */
-bool AUnrealTestCharacter::Server_LightAttack_Validate()
-{
-	if (!AttackMontage)
-	{
-		return false;
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[SERVER] Executing LightAttack_Validate..."))
-	return true;
-	
-}
-
 void AUnrealTestCharacter::Server_LightAttack_Implementation()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[SERVER] LightAttack_Implementation HAS BEEN CALLED"))
-	LightAttack();
-	Server_SetCanDoAction(false);
-}
-
-bool AUnrealTestCharacter::Server_HeavyAttack_Validate()
-{
-	if (!AttackMontage)
+	if (!HasAuthority() || ActionState != PAS_Neutral)
 	{
-		return false;
+		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("[SERVER] Executing HeavyAttack_Validate..."))
-	return true;
+	LightAttack();
+	ActionState = PAS_Attack;
 }
 
 void AUnrealTestCharacter::Server_HeavyAttack_Implementation()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[SERVER] HeavyAttack_Implementation HAS BEEN CALLED"))
+	if (!HasAuthority() || ActionState != PAS_Neutral)
+	{
+		return;
+	}
+
 	HeavyAttack();
-	Server_SetCanDoAction(false);
+	ActionState = PAS_Attack;
 }
 
-void AUnrealTestCharacter::Server_SetCanDoAction_Implementation(bool NewValue)
+void AUnrealTestCharacter::Server_UseShield_Implementation(bool IsPressingToBlock)
 {
-	bCanDoAction = NewValue;
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (ActionState == PAS_Neutral && IsPressingToBlock)
+	{
+		ExecuteBlock_Implementation();
+		ActionState = PAS_Block;
+		return;		
+	}
+
+	if (ActionState == PAS_Block && !IsPressingToBlock)
+	{
+		ExitBlock_Implementation();
+		ActionState = PAS_Neutral;
+	}
 }

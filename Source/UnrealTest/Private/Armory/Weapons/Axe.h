@@ -19,7 +19,7 @@ class AAxe : public AArmoryBase
 public:
 	AAxe();
 
-	UBoxComponent* GetCollider() const;
+	void EnableCollider(bool bEnabled) const;
 	float GetDamage() const;
 	
 private:	

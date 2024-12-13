@@ -10,9 +10,18 @@ AAxe::AAxe()
 	Collider = CreateDefaultSubobject<UBoxComponent>(TEXT("Collider"));
 }
 
-UBoxComponent* AAxe::GetCollider() const
+void AAxe::EnableCollider(bool bEnabled) const
 {
-	return Collider.Get();
+	if (Collider.Get() != nullptr)
+	{
+		if (bEnabled)
+		{
+			Collider.Get()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			return;
+		}
+
+		Collider.Get()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 }
 
 float AAxe::GetDamage() const
