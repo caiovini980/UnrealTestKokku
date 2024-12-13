@@ -19,13 +19,15 @@ class AAxe : public AArmoryBase
 public:
 	AAxe();
 
+	void SetupArmory() override;
+
 	void EnableCollider(bool bEnabled) const;
 	float GetDamage() const;
 	
 private:	
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	TObjectPtr<UBoxComponent> Collider;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY(EditDefaultsOnly)
 	float Damage{10};
 };

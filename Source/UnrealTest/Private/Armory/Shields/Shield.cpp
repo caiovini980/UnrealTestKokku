@@ -3,6 +3,10 @@
 
 #include "Armory/Shields/Shield.h"
 
+void AShield::SetupArmory()
+{
+}
+
 void AShield::ReduceShield()
 {
 	if (ShieldLives > 0)
@@ -14,3 +18,4 @@ void AShield::ReduceShield()
 	// Destroy on server and replicate on clients
 	Destroy();
 }
+

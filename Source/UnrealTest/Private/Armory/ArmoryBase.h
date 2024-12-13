@@ -21,9 +21,13 @@ public:
 	// Sets default values for this actor's properties
 	AArmoryBase();
 
+	virtual void SetupArmory();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+
+	bool bIsActive{ true };
 
 public:	
 	// Called every frame

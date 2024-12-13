@@ -14,10 +14,13 @@ class AShield : public AArmoryBase
 {
 	GENERATED_BODY()
 public:
+	// Inherited via AArmoryBase
+	void SetupArmory() override;
+
 	void ReduceShield();
-	
+
 private:
 	// Set this variable on the server
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditDefaultsOnly)
 	int ShieldLives{3};
 };

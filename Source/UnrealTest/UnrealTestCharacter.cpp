@@ -107,6 +107,7 @@ void AUnrealTestCharacter::AttackEndedNotifyImplementation()
 
 void AUnrealTestCharacter::DisableWeaponColliderNotifyImplementation()
 {
+	// TODO Send this to the server
 	if (HasAuthority() && AxeRef.Get())
 	{
 		AxeRef.Get()->EnableCollider(false);
@@ -128,10 +129,12 @@ void AUnrealTestCharacter::BeginPlay()
 		if (AShield* ShieldObject = Cast<AShield>(Child))
 		{
 			ShieldRef = ShieldObject;
+			ShieldRef->SetupArmory();
 		}
 		else if (AAxe* AxeObject = Cast<AAxe>(Child))
 		{
 			AxeRef = AxeObject;
+			AxeRef->SetupArmory();
 		}
 	}
 	

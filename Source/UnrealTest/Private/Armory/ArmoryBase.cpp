@@ -13,6 +13,10 @@ AArmoryBase::AArmoryBase()
 	RootComponent = StaticMesh;
 }
 
+void AArmoryBase::SetupArmory()
+{
+}
+
 // Called when the game starts or when spawned
 void AArmoryBase::BeginPlay()
 {
