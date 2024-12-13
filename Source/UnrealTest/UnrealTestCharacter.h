@@ -95,16 +95,19 @@ private:
 	
 	/* Server Methods */
 	/* Multicasts */
-	UFUNCTION(NetMulticast, reliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void HeavyAttack();
 
-	UFUNCTION(NetMulticast, reliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void LightAttack();
 
-	UFUNCTION(NetMulticast, reliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void ExecuteBlock();
 
-	UFUNCTION(NetMulticast, reliable)
+	// UFUNCTION(NetMulticast, Reliable)
+	// void DisableWeaponCollider();
+
+	UFUNCTION(NetMulticast, Reliable)
 	void ExitBlock();
 	
 	/* Run On Server */
@@ -116,6 +119,8 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void Server_UseShield(bool IsPressingToBlock);
-	
+
+	UFUNCTION(Server, Reliable)
+	void Server_SetWeaponCollider(bool bEnabled);
 };
 

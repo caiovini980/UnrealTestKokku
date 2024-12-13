@@ -107,10 +107,9 @@ void AUnrealTestCharacter::AttackEndedNotifyImplementation()
 
 void AUnrealTestCharacter::DisableWeaponColliderNotifyImplementation()
 {
-	// TODO Send this to the server
 	if (HasAuthority() && AxeRef.Get())
 	{
-		AxeRef.Get()->EnableCollider(false);
+		Server_SetWeaponCollider(false);
 	}
 }
 
@@ -262,14 +261,20 @@ void AUnrealTestCharacter::ExitBlock_Implementation()
 
 void AUnrealTestCharacter::HeavyAttack_Implementation()
 {
-	PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
-	AxeRef.Get()->EnableCollider(true);
+	if (AttackMontage && AxeRef)
+	{
+		PlayAnimMontage(AttackMontage.Get(), 1, FName("HeavyAttack"));
+		Server_SetWeaponCollider(true);
+	}
 }
 
 void AUnrealTestCharacter::LightAttack_Implementation()
 {
-	PlayAnimMontage(AttackMontage.Get(), 1.5, FName("LightAttack"));
-	AxeRef.Get()->EnableCollider(true);
+	if (AttackMontage && AxeRef)
+	{
+		PlayAnimMontage(AttackMontage.Get(), 1.5, FName("LightAttack"));
+		Server_SetWeaponCollider(true);
+	}
 }
 
 /* Server Methods */
@@ -322,4 +327,9 @@ void AUnrealTestCharacter::Server_UseShield_Implementation(bool IsPressingToBloc
 		ExitBlock_Implementation();
 		ActionState = PAS_Neutral;
 	}
+}
+
+void AUnrealTestCharacter::Server_SetWeaponCollider_Implementation(bool bEnabled)
+{
+	AxeRef.Get()->EnableCollider(bEnabled);
 }
